@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swaram</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Instrument+Serif:ital@0;1&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            /* Palette */
+            --bg-primary: #09090b;
+            --bg-surface: #111114;
+            --bg-elevated: #1a1a1f;
+            --border: #27272a;
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-dim: #52525b;
+
+            /* State Colors */
+            --idle-color: #52525b;
+            --listening-glow: #f97316;
+            /* Orange */
+            --listening-core: #fff7ed;
+            --processing-glow: #8b5cf6;
+            /* Purple */
+            --processing-core: #f5f3ff;
+            --speaking-glow: #14b8a6;
+            /* Teal */
+            --speaking-core: #f0fdfa;
+
+            /* Chat Bubbles */
+            --user-bubble-bg: #27272a;
+            --ai-bubble-bg: #18181b;
+
+            /* Orb Variables (Updated by JS) */
+            --orb-scale: 1;
+            --orb-glow-color: var(--idle-color);
+            --orb-core-color: #71717a;
+            --orb-border-radius: 50%;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            /* Prevent selection for app-like feel */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'DM Sans', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Subtle grain texture overlay */
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+        }
+
+        /* --- Header & Controls --- */
+        header {
+            text-align: center;
+            padding: 24px 0 12px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-family: 'Instrument Serif', serif;
+            font-weight: 400;
+            font-size: 2.5rem;
+            margin: 0;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 0 16px 24px;
+            z-index: 10;
+        }
+
+        .select-wrapper {
+            position: relative;
+        }
+
+        select {
+            appearance: none;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 32px 8px 16px;
+            border-radius: 20px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        select:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: #3f3f46;
+            color: var(--text-primary);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--speaking-glow);
+        }
+
+        /* Custom arrow for select */
+        .select-wrapper::after {
+            content: '↓';
+            font-size: 0.8rem;
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            pointer-events: none;
+        }
+
+        /* --- Siri Orb Area --- */
+        .orb-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 240px;
+            /* Fixed height for consistency */
+            position: relative;
+            z-index: 5;
+        }
+
+        .orb-container {
+            width: 120px;
+            height: 120px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            /* No tap highlight */
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s ease-out;
+        }
+
+        .orb-container:active {
+            transform: scale(0.95);
+        }
+
+        /* Layers of the Orb */
+        .orb-glow {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, var(--orb-glow-color) 0%, transparent 70%);
+            opacity: 0.4;
+            filter: blur(20px);
+            transform: scale(var(--orb-scale));
+            transition: transform 0.1s linear, background 0.5s ease;
+            mix-blend-mode: screen;
+        }
+
+        .orb-body {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: var(--orb-glow-color);
+            border-radius: var(--orb-border-radius, 50%);
+            filter: blur(8px);
+            /* This morphing needs to be high perf, so we'll use JS or simple CSS keyframes for idle */
+            transition: background 0.5s ease, border-radius 0.2s ease, transform 0.05s linear;
+            transform: scale(var(--orb-scale));
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Inner core for depth */
+        .orb-core {
+            position: absolute;
+            width: 40%;
+            height: 40%;
+            background: var(--orb-core-color);
+            border-radius: 50%;
+            filter: blur(4px);
+            opacity: 0.8;
+            transition: background 0.5s ease;
+        }
+
+        .orb-icon {
+            position: relative;
+            font-size: 24px;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+            color: white;
+            pointer-events: none;
+        }
+
+        .status-message {
+            margin-top: 32px;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            min-height: 1.2rem;
+            opacity: 0.8;
+            transition: color 0.3s ease;
+        }
+
+        /* --- Chat Area --- */
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 20px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            scroll-behavior: smooth;
+            /* Scrollbar styling */
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+
+        #chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chat-container::-webkit-scrollbar-thumb {
+            background-color: var(--border);
+            border-radius: 3px;
+        }
+
+        .message-row {
+            display: flex;
+            width: 100%;
+            animation: slideIn 0.4s ease-out forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+        .message-row.ai {
+            justify-content: flex-start;
+        }
+
+        .bubble {
+            max-width: 85%;
+            padding: 14px 20px;
+            font-size: 1rem;
+            line-height: 1.5;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .user .bubble {
+            background-color: var(--user-bubble-bg);
+            color: var(--text-primary);
+            border-radius: 20px 20px 4px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .ai .bubble {
+            background-color: var(--ai-bubble-bg);
+            color: #d4d4d8;
+            border-radius: 20px 20px 20px 4px;
+            border: 1px solid var(--border);
+        }
+
+        .timestamp {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 6px;
+            text-align: right;
+            display: block;
+        }
+
+        .ai .timestamp {
+            text-align: left;
+            margin-bottom: 8px;
+            /* Space for actions */
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 8px;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: none;
+            color: var(--speaking-glow);
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 500;
+        }
+
+        .action-btn:hover {
+            background: rgba(20, 184, 166, 0.1);
+        }
+
+        /* Typing indicator */
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+            padding: 8px 12px;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Animations for different states */
+        @keyframes breathe {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes pulse-process {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+        }
+
+        /* State Classes */
+        .state-idle .orb-body {
+            animation: breathe 4s infinite ease-in-out;
+        }
+
+        .state-processing .orb-body {
+            animation: pulse-process 1.5s infinite ease-in-out;
+        }
+
+        .state-listening .orb-body {
+            /* Handled by JS audio reactivity, no CSS animation */
+        }
+
+        .state-speaking .orb-body {
+            /* Handled by JS audio reactivity */
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            .orb-section {
+                min-height: 200px;
+            }
+
+            .orb-container {
+                width: 100px;
+                height: 100px;
+            }
+
+            .subtitle {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>CallMeMaybe</h1>
+    </header>
+
+    <div class="controls">
+        <div class="select-wrapper">
+            <select id="language-select">
+                <option value="hi-IN">Hindi</option>
+                <option value="en-IN" selected>English (IN)</option>
+                <option value="bn-IN">Bengali</option>
+                <option value="ta-IN">Tamil</option>
+                <option value="te-IN">Telugu</option>
+                <option value="gu-IN">Gujarati</option>
+                <option value="kn-IN">Kannada</option>
+                <option value="ml-IN">Malayalam</option>
+                <option value="mr-IN">Marathi</option>
+                <option value="pa-IN">Punjabi</option>
+                <option value="od-IN">Odia</option>
+            </select>
+        </div>
+        <div class="select-wrapper">
+            <select id="voice-select">
+                <option value="Anushka">Anushka (F)</option>
+                <option value="Manisha">Manisha (F)</option>
+                <option value="Vidya">Vidya (F)</option>
+                <option value="Arya">Arya (F)</option>
+                <option value="Abhilash">Abhilash (M)</option>
+                <option value="Karun">Karun (M)</option>
+                <option value="Hitesh">Hitesh (M)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="orb-section state-idle" id="orb-section">
+        <div class="orb-container" id="orb-btn">
+            <div class="orb-glow"></div>
+            <div class="orb-body"></div>
+            <div class="orb-core"></div>
+            <div class="orb-icon" id="orb-icon"></div>
+        </div>
+        <div class="status-message" id="status-text">Tap to start conversation</div>
+    </div>
+
+    <div id="chat-container">
+        <!-- Messages will be injected here -->
+        <div class="message-row ai">
+            <div class="bubble">
+                Namaste! I am Swaram. Tap the orb to start speaking.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const CONFIG = {
+            silenceThreshold: 0.04,  // Increased to 0.04 to handle background noise (was 0.03, originally 0.015)
+            silenceDuration: 1200, // ms - Reduced from 1800ms to 1.2 seconds for faster response
+            minRecordTime: 500,    // ms
+            gracePeriod: 300,      // ms
+        };
+
+        // --- State ---
+        const APP_STATE = {
+            IDLE: 'idle',
+            LISTENING: 'listening',
+            PROCESSING: 'processing',
+            SPEAKING: 'speaking'
+        };
+
+        let currentState = APP_STATE.IDLE;
+        let audioContext = null;
+        let analyser = null;
+        let microphoneSource = null;
+        let ttsAudioSource = null;
+        let ttsAudioElement = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let animationFrameId = null;
+
+        let silenceStartTime = null;
+        let speechDetected = false;
+        let recordingStartTime = 0;
+        let silenceCheckInterval = null;
+
+        let conversationHistory = [];
+
+        // --- DOM Elements ---
+        const orbSection = document.getElementById('orb-section');
+        const orbBtn = document.getElementById('orb-btn');
+        const orbIcon = document.getElementById('orb-icon');
+        const statusText = document.getElementById('status-text');
+        const chatContainer = document.getElementById('chat-container');
+        const langSelect = document.getElementById('language-select');
+        const voiceSelect = document.getElementById('voice-select');
+        const rootStyles = document.documentElement.style;
+
+        // --- Event Listeners ---
+        orbBtn.addEventListener('click', handleOrbClick);
+
+        // --- Initialization ---
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        // --- Core Interaction Logic ---
+        async function handleOrbClick() {
+            console.log(`🖱️  ORB CLICKED | Current State: ${currentState}`);
+            initAudioContext();
+            playTone('click');
+
+            if (currentState === APP_STATE.IDLE) {
+                console.log("▶️  Starting new conversation turn");
+                startUnknownTurn();
+            } else if (currentState === APP_STATE.SPEAKING) {
+                // Interrupt!
+                console.log("⏸️  User interrupted playback.");
+                stopAudioPlayback();
+                startUnknownTurn(); // Switch immediately to listening
+            } else if (currentState === APP_STATE.LISTENING) {
+                // User clicked while listening - FORCE PROCESS instead of cancel
+                console.log("⏯️  User clicked to finish speaking - Processing audio...");
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    clearInterval(silenceCheckInterval);
+                    mediaRecorder.stop(); // This will trigger processUserAudio via onstop handler
+                }
+            } else if (currentState === APP_STATE.PROCESSING) {
+                // In processing state, click acts as "Cancel"
+                console.log("⏹️  User clicked while processing - Canceling");
+                stopConversation();
+            }
+        }
+
+        function startUnknownTurn() {
+            startListening();
+        }
+
+        function stopConversation() {
+            console.log("🛑 === STOPPING CONVERSATION LOOP ===");
+            console.log(`   Recorder state: ${mediaRecorder ? mediaRecorder.state : 'null'}`);
+
+            // Stop recorder if active
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                console.log("   Stopping mediaRecorder...");
+                mediaRecorder.stop();
+                // We'll handle the 'stop' event, but we need to know NOT to process it if we cancelled.
+                // Simplest is to just reset state.
+            }
+
+            stopAudioPlayback();
+            stopVisualizer();
+
+            if (silenceCheckInterval) {
+                console.log("   Clearing silence check interval");
+                clearInterval(silenceCheckInterval);
+            }
+
+            console.log("   Setting state to IDLE");
+            setState(APP_STATE.IDLE);
+        }
+
+        function setState(newState) {
+            console.log(`🔄 STATE CHANGE: ${currentState} → ${newState}`);
+            currentState = newState;
+
+            // Update UI Interface
+            orbSection.className = `orb-section state-${newState}`;
+
+            // Update Variables & Text
+            switch (newState) {
+                case APP_STATE.IDLE:
+                    rootStyles.setProperty('--orb-glow-color', 'var(--idle-color)');
+                    rootStyles.setProperty('--orb-core-color', '#71717a');
+                    orbIcon.style.opacity = '0.5';
+                    statusText.textContent = "Tap to start conversation";
+                    break;
+                case APP_STATE.LISTENING:
+                    rootStyles.setProperty('--orb-glow-color', 'var(--listening-glow)');
+                    rootStyles.setProperty('--orb-core-color', 'var(--listening-core)');
+                    orbIcon.style.opacity = '0';
+                    statusText.textContent = "Listening...";
+                    playTone('start');
+                    break;
+                case APP_STATE.PROCESSING:
+                    rootStyles.setProperty('--orb-glow-color', 'var(--processing-glow)');
+                    rootStyles.setProperty('--orb-core-color', 'var(--processing-core)');
+                    orbIcon.style.opacity = '0';
+                    statusText.textContent = "Thinking...";
+                    rootStyles.setProperty('--orb-scale', '1'); // Reset scale for pulse anim
+                    playTone('stop');
+                    break;
+                case APP_STATE.SPEAKING:
+                    rootStyles.setProperty('--orb-glow-color', 'var(--speaking-glow)');
+                    rootStyles.setProperty('--orb-core-color', 'var(--speaking-core)');
+                    orbIcon.style.opacity = '0';
+                    statusText.textContent = "Speaking...";
+                    break;
+            }
+        }
+
+        // --- Audio Recording & STT ---
+        async function startListening() {
+            console.log("🎤 === START LISTENING CALLED ===");
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log("✅ Microphone access granted");
+                setState(APP_STATE.LISTENING);
+
+                // Audio Graph for Analysis
+                microphoneSource = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.5;
+                microphoneSource.connect(analyser);
+
+                startVisualizer(true); // Input mode
+
+                // Recorder
+                audioChunks = [];
+                // Check mime support
+                let mimeType = 'audio/webm;codecs=opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/mp4'; // Safari fallback often
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = ''; // Let browser decide
+                    }
+                }
+
+                mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    console.log(`🛑 MediaRecorder STOPPED | Current State: ${currentState} | AudioChunks: ${audioChunks.length}`);
+                    // Cleanup stream tracks
+                    stream.getTracks().forEach(track => track.stop());
+
+                    if (currentState === APP_STATE.LISTENING) {
+                        console.log("✅ State is LISTENING - Processing audio...");
+                        // If we naturally stopped (silence) or were forced to stop to process
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        console.log(`📦 Audio blob size: ${audioBlob.size} bytes`);
+                        processUserAudio(audioBlob);
+                    } else {
+                        console.warn(`⚠️  State is ${currentState} (not LISTENING) - SKIPPING processUserAudio()`);
+                    }
+                };
+
+                mediaRecorder.start();
+                console.log("🔴 Recording started");
+                recordingStartTime = Date.now();
+                speechDetected = false;
+                silenceStartTime = null;
+
+                // Silence Detection Loop
+                if (silenceCheckInterval) clearInterval(silenceCheckInterval);
+                silenceCheckInterval = setInterval(checkSilence, 100);
+                console.log("👂 Silence detection active");
+
+            } catch (err) {
+                console.error("Mic Error:", err);
+                alert("Could not access microphone.");
+                setState(APP_STATE.IDLE);
+            }
+        }
+
+        function checkSilence() {
+            if (currentState !== APP_STATE.LISTENING || !analyser) return;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+
+            // Calculate RMS (Root Mean Square) ~ approximate volume
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += (dataArray[i] / 255) * (dataArray[i] / 255);
+            }
+            const rms = Math.sqrt(sum / dataArray.length);
+            // Only log RMS every 2 seconds to reduce spam (or on important events)
+            if (!window.lastRMSLog || Date.now() - window.lastRMSLog > 2000) {
+                console.log(`📊 RMS: ${rms.toFixed(4)} | Threshold: ${CONFIG.silenceThreshold} | Speech: ${speechDetected}`);
+                window.lastRMSLog = Date.now();
+            }
+
+            const now = Date.now();
+
+            if (rms > CONFIG.silenceThreshold) {
+                // Sound detected
+                if (!speechDetected) {
+                    speechDetected = true;
+                    console.log("🗣️  SPEECH DETECTED!");
+                }
+                silenceStartTime = null; // Reset silence timer
+            } else {
+                // Silence
+                if (speechDetected && (now - recordingStartTime > CONFIG.minRecordTime)) {
+                    // We interpret this as "potential end of turn"
+                    if (!silenceStartTime) {
+                        silenceStartTime = now;
+                        console.log("🤫 Silence started, waiting for " + CONFIG.silenceDuration + "ms...");
+                    }
+
+                    if (now - silenceStartTime > CONFIG.silenceDuration) {
+                        console.log("⏹️  SILENCE THRESHOLD REACHED - Stopping recorder");
+                        mediaRecorder.stop(); // Triggers processing
+                        clearInterval(silenceCheckInterval);
+                    }
+                }
+            }
+        }
+
+        // --- Processing Pipeline ---
+        async function processUserAudio(audioBlob) {
+            console.log("🚀 === PROCESS USER AUDIO CALLED ===");
+            setState(APP_STATE.PROCESSING);
+            stopVisualizer();
+
+            try {
+                // 1. STT
+                console.log("📤 Sending STT request...");
+                const formData = new FormData();
+                formData.append('file', audioBlob);
+                formData.append('language_code', langSelect.value);
+
+                statusText.textContent = "Transcribing...";
+                const sttRes = await fetch('/api/stt', { method: 'POST', body: formData });
+                console.log(`📥 STT Response: ${sttRes.status} ${sttRes.statusText}`);
+                if (!sttRes.ok) throw new Error('STT failed');
+                const sttJson = await sttRes.json();
+                const transcript = sttJson.transcript;
+                console.log(`📝 Transcript: "${transcript}"`);
+
+                if (!transcript || !transcript.trim()) {
+                    console.log("❌ Empty transcript. Restarting listen.");
+                    startListening();
+                    return;
+                }
+
+                addMessageToChat('user', transcript);
+                conversationHistory.push({ role: 'user', content: transcript });
+
+                // 2. Chat Completion
+                console.log("📤 Sending Chat request...");
+                statusText.textContent = "Thinking...";
+                const chatRes = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: conversationHistory,
+                        language_code: langSelect.value
+                    })
+                });
+                console.log(`📥 Chat Response: ${chatRes.status} ${chatRes.statusText}`);
+                if (!chatRes.ok) throw new Error('Chat failed');
+                const chatJson = await chatRes.json();
+                const reply = chatJson.reply;
+                console.log(`💬 AI Reply: "${reply}"`);
+
+                addMessageToChat('ai', reply);
+                conversationHistory.push({ role: 'assistant', content: reply });
+
+                // 3. TTS
+                console.log("📤 Sending TTS request...");
+                statusText.textContent = "Generating voice...";
+                const ttsRes = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: reply,
+                        language_code: langSelect.value,
+                        speaker: voiceSelect.value
+                    })
+                });
+                console.log(`📥 TTS Response: ${ttsRes.status} ${ttsRes.statusText}`);
+                if (!ttsRes.ok) throw new Error('TTS failed');
+                const ttsJson = await ttsRes.json();
+                console.log("🔊 TTS audio received, starting playback...");
+
+                // 4. Playback
+                playResponseAudio(ttsJson.audio_base64);
+
+            } catch (err) {
+                console.error("Pipeline Error:", err);
+                statusText.textContent = "Error occurred.";
+                setTimeout(() => setState(APP_STATE.IDLE), 2000);
+            }
+        }
+
+        // --- Audio Playback ---
+        function playResponseAudio(base64) {
+            setState(APP_STATE.SPEAKING);
+
+            // Create Audio Element
+            const audioSrc = "data:audio/wav;base64," + base64;
+            ttsAudioElement = new Audio(audioSrc);
+
+            // Connect to Analyser for Output Visualization
+            // Note: MediaElementSource requires the audio element to be playing or cross-origin safe. 
+            // Data URI is safe.
+            try {
+                if (!ttsAudioSource) {
+                    // We only create this once effectively per session context usually
+                    // But here we create new Audio elements. 
+                    // Best practice: Reuse Audio element or use AudioBufferSourceNode.
+                    // For Web Audio visualization of HTMLAudioElement, we need `createMediaElementSource`.
+                    // But an Audio Element can only be connected to one node ever.
+                }
+
+                // Using AudioBuffer approach is easier for Visualizer integration usually, 
+                // but let's try direct Audio element for simplicity of flow handling (onended).
+                // Actually, let's decode audio data to use a SourceNode, it's cleaner for Web Audio API visualizers.
+
+                // Fix: Decode base64 to array buffer
+                const binaryString = window.atob(base64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+
+                audioContext.decodeAudioData(bytes.buffer, (buffer) => {
+                    playBuffer(buffer);
+                }, (e) => console.error("Decode error", e));
+
+            } catch (e) {
+                console.error("Playback prep error", e);
+                setState(APP_STATE.IDLE);
+            }
+        }
+
+        function playBuffer(buffer) {
+            // Create Source
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            ttsAudioSource = source; // Keep ref to stop if needed
+
+            // Connect to Analyser
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.7; // smoother for output
+
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+
+            startVisualizer(false); // Output mode
+
+            source.onended = () => {
+                if (currentState === APP_STATE.SPEAKING) {
+                    console.log("Audio finished. Auto-listening.");
+                    startListening();
+                }
+            };
+
+            source.start(0);
+        }
+
+        function stopAudioPlayback() {
+            if (ttsAudioSource) {
+                try {
+                    ttsAudioSource.stop();
+                    ttsAudioSource.disconnect();
+                } catch (e) { }
+                ttsAudioSource = null;
+            }
+            if (ttsAudioElement) {
+                ttsAudioElement.pause();
+                ttsAudioElement = null;
+            }
+        }
+
+        // --- Visualizer & Orb Animation ---
+        function startVisualizer(isInput) {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            function render() {
+                animationFrameId = requestAnimationFrame(render);
+
+                if (!analyser) return;
+
+                const dataArray = new Uint8Array(analyser.frequencyBinCount); // 128
+                analyser.getByteFrequencyData(dataArray);
+
+                // Calculate "Energy" for Scale
+                let sum = 0;
+                // Focus on lower-mid frequencies for "voice" energy (indexes 3 to 20 approx)
+                for (let i = 2; i < 20; i++) {
+                    sum += dataArray[i];
+                }
+                const avg = sum / 18;
+                const normalized = avg / 255;
+
+                // Dynamic Orb Scale
+                // Base scale 1, max scale ~1.4
+                const targetScale = 1 + (normalized * 0.4);
+                rootStyles.setProperty('--orb-scale', targetScale.toFixed(3));
+
+                // Blob Morphing
+                // We'll generate random border-radius config based on energy
+                if (normalized > 0.1) {
+                    const r1 = 50 + (Math.random() * 20 - 10) * normalized;
+                    const r2 = 50 + (Math.random() * 20 - 10) * normalized;
+                    const r3 = 50 + (Math.random() * 20 - 10) * normalized;
+                    const r4 = 50 + (Math.random() * 20 - 10) * normalized;
+
+                    // Simple blob shape
+                    const blobShape = `${r1}% ${100 - r1}% ${r2}% ${100 - r2}% / ${r3}% ${r4}% ${100 - r4}% ${100 - r3}%`;
+                    rootStyles.setProperty('--orb-border-radius', blobShape);
+                } else {
+                    rootStyles.setProperty('--orb-border-radius', '50%');
+                }
+            }
+            render();
+        }
+
+        function stopVisualizer() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            rootStyles.setProperty('--orb-scale', '1');
+            rootStyles.setProperty('--orb-border-radius', '50%');
+        }
+
+        // --- Visual Helpers ---
+        function addMessageToChat(role, text) {
+            // Remove any existing "Typing..." indicators
+            const existingTyping = document.querySelector('.typing-indicator');
+            if (existingTyping) existingTyping.remove();
+
+            const row = document.createElement('div');
+            row.className = `message-row ${role}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = text;
+
+            const timestamp = document.createElement('span');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            bubble.appendChild(timestamp);
+
+            if (role === 'ai') {
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+
+                const replayBtn = document.createElement('button');
+                replayBtn.className = 'action-btn';
+                replayBtn.textContent = '▶ Replay';
+                replayBtn.onclick = () => replayMessage(text);
+
+                actions.appendChild(replayBtn);
+                bubble.appendChild(actions);
+            }
+
+            row.appendChild(bubble);
+            chatContainer.appendChild(row);
+            scrollToBottom();
+        }
+
+        async function replayMessage(text) {
+            // Replay logic: Just TTS again, but don't enter conversation loop
+            // Or maybe enter Speaking state? 
+            // Requirement: "Replay that turn's audio". 
+            // Let's just play it without changing global state loop, to avoid confusion.
+            try {
+                statusText.textContent = "Replaying...";
+                const res = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text,
+                        language_code: langSelect.value,
+                        speaker: voiceSelect.value
+                    })
+                });
+                const json = await res.json();
+
+                // Play without visualizer logic or state change for simplicity? 
+                // Or better: Use Speaking state but set a flag "one-shot"
+                // Let's use simple play
+                const audio = new Audio("data:audio/wav;base64," + json.audio_base64);
+                audio.onended = () => { statusText.textContent = "Tap to start conversation"; setState(APP_STATE.IDLE); };
+                audio.play();
+
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function playTone(type) {
+            if (!audioContext) return;
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            const now = audioContext.currentTime;
+
+            if (type === 'start') {
+                // Rising tone (Start Listening)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'stop') {
+                // Descending tone (Stop Listening/Processing)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.linearRampToValueAtTime(400, now + 0.15);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'click') {
+                // Very short click
+                osc.frequency.setValueAtTime(1000, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            }
+        }
+
+    </script>
+</body>
+
+</html>
