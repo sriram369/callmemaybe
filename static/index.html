@@ -496,6 +496,7 @@
             silenceDuration: 1200, // ms - Reduced from 1800ms to 1.2 seconds for faster response
             minRecordTime: 500,    // ms
             gracePeriod: 300,      // ms
+            maxRecordTime: 25000,  // ms - Maximum recording duration (25 seconds to avoid 30s API limit)
         };
 
         // --- State ---
@@ -520,6 +521,16 @@
         let speechDetected = false;
         let recordingStartTime = 0;
         let silenceCheckInterval = null;
+
+        // Adaptive silence detection
+        let backgroundNoise = 0;
+        let backgroundSamples = [];
+        let calibrationComplete = false;
+        const CALIBRATION_TIME = 500; // ms to calibrate background noise
+        const NOISE_MARGIN = 0.02; // Add this to background noise for threshold
+
+        // Conversation flow control
+        let isFarewellDetected = false; // Flag to end conversation loop
 
         let conversationHistory = [];
 
@@ -697,6 +708,12 @@
                 speechDetected = false;
                 silenceStartTime = null;
 
+                // Reset adaptive calibration
+                backgroundNoise = 0;
+                backgroundSamples = [];
+                calibrationComplete = false;
+                console.log("📊 Calibrating background noise...");
+
                 // Silence Detection Loop
                 if (silenceCheckInterval) clearInterval(silenceCheckInterval);
                 silenceCheckInterval = setInterval(checkSilence, 100);
@@ -721,15 +738,48 @@
                 sum += (dataArray[i] / 255) * (dataArray[i] / 255);
             }
             const rms = Math.sqrt(sum / dataArray.length);
-            // Only log RMS every 2 seconds to reduce spam (or on important events)
-            if (!window.lastRMSLog || Date.now() - window.lastRMSLog > 2000) {
-                console.log(`📊 RMS: ${rms.toFixed(4)} | Threshold: ${CONFIG.silenceThreshold} | Speech: ${speechDetected}`);
-                window.lastRMSLog = Date.now();
-            }
 
             const now = Date.now();
 
-            if (rms > CONFIG.silenceThreshold) {
+            // Check if we've exceeded maximum recording duration
+            if (now - recordingStartTime > CONFIG.maxRecordTime) {
+                console.warn(`⏱️  MAX RECORDING TIME (${CONFIG.maxRecordTime / 1000}s) REACHED - Stopping recorder`);
+                mediaRecorder.stop();
+                clearInterval(silenceCheckInterval);
+                return;
+            }
+
+            // --- ADAPTIVE CALIBRATION PHASE ---
+            if (!calibrationComplete) {
+                const calibrationElapsed = now - recordingStartTime;
+                if (calibrationElapsed < CALIBRATION_TIME) {
+                    // Still calibrating - collect samples
+                    backgroundSamples.push(rms);
+                    return;
+                } else {
+                    // Calibration complete - calculate background noise
+                    if (backgroundSamples.length > 0) {
+                        backgroundNoise = backgroundSamples.reduce((a, b) => a + b) / backgroundSamples.length;
+                        calibrationComplete = true;
+                        console.log(`✅ Calibration complete! Background noise: ${backgroundNoise.toFixed(4)}, Threshold: ${(backgroundNoise + NOISE_MARGIN).toFixed(4)}`);
+                    } else {
+                        // Fallback if no samples
+                        backgroundNoise = CONFIG.silenceThreshold;
+                        calibrationComplete = true;
+                    }
+                }
+            }
+
+            // Use adaptive threshold
+            const adaptiveThreshold = backgroundNoise + NOISE_MARGIN;
+
+            // Only log RMS every 2 seconds to reduce spam
+            if (!window.lastRMSLog || Date.now() - window.lastRMSLog > 2000) {
+                console.log(`📊 RMS: ${rms.toFixed(4)} | Adaptive Threshold: ${adaptiveThreshold.toFixed(4)} | Speech: ${speechDetected}`);
+                window.lastRMSLog = Date.now();
+            }
+
+            if (rms > adaptiveThreshold) {
                 // Sound detected
                 if (!speechDetected) {
                     speechDetected = true;
@@ -779,6 +829,19 @@
                     console.log("❌ Empty transcript. Restarting listen.");
                     startListening();
                     return;
+                }
+
+                // Check for farewell phrases
+                const farewellPhrases = [
+                    'bye', 'goodbye', 'good bye', 'see you', 'talk later',
+                    'that\'s all', 'i\'m done', 'thank you bye', 'thanks bye',
+                    'exit', 'stop', 'end conversation', 'end call'
+                ];
+                const transcriptLower = transcript.toLowerCase();
+                isFarewellDetected = farewellPhrases.some(phrase => transcriptLower.includes(phrase));
+
+                if (isFarewellDetected) {
+                    console.log("👋 Farewell phrase detected in transcript!");
                 }
 
                 addMessageToChat('user', transcript);
@@ -891,8 +954,14 @@
 
             source.onended = () => {
                 if (currentState === APP_STATE.SPEAKING) {
-                    console.log("Audio finished. Auto-listening.");
-                    startListening();
+                    if (isFarewellDetected) {
+                        console.log("👋 Farewell detected. Ending conversation. Click orb to start new conversation.");
+                        setState(APP_STATE.IDLE);
+                        isFarewellDetected = false; // Reset flag
+                    } else {
+                        console.log("🔄 Audio finished. Auto-starting next turn...");
+                        startListening(); // Continue conversation loop
+                    }
                 }
             };
 

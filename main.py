@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 import httpx
 from pydantic import BaseModel
+from system_prompt import SWARAM_SYSTEM_PROMPT, CHAT_CONFIG
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -101,25 +102,26 @@ async def chat_completion(request: ChatRequest):
         "Content-Type": "application/json"
     }
     
-    # Construct system prompt if not present or ensure it guides the model correctly
+    # Use the master system prompt from system_prompt.py
     system_prompt = {
         "role": "system",
-        "content": "You are a helpful conversational assistant. Respond in the same language the user speaks. Keep responses concise (1-3 sentences) since they will be spoken aloud."
+        "content": SWARAM_SYSTEM_PROMPT
     }
-    
+
     original_messages = [msg.dict() for msg in request.messages]
-    
+
     # Ensure system prompt is first
     if not original_messages or original_messages[0]["role"] != "system":
         messages = [system_prompt] + original_messages
     else:
         messages = original_messages
 
+    # Use configuration from system_prompt.py
     payload = {
         "model": "sarvam-m",
         "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 300
+        "temperature": CHAT_CONFIG["temperature"],
+        "max_tokens": CHAT_CONFIG["max_tokens"]
     }
 
     async with httpx.AsyncClient() as client:
