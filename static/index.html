@@ -14,35 +14,36 @@
 
     <style>
         :root {
+            /* White & Blue Theme - TrumpRx Inspired */
             /* Palette */
-            --bg-primary: #09090b;
-            --bg-surface: #111114;
-            --bg-elevated: #1a1a1f;
-            --border: #27272a;
-            --text-primary: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-dim: #52525b;
+            --bg-primary: #ffffff;
+            --bg-surface: #f8fafc;
+            --bg-elevated: #f1f5f9;
+            --border: #e0f2fe;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-dim: #94a3b8;
 
-            /* State Colors */
-            --idle-color: #52525b;
-            --listening-glow: #f97316;
-            /* Orange */
-            --listening-core: #fff7ed;
-            --processing-glow: #8b5cf6;
-            /* Purple */
-            --processing-core: #f5f3ff;
-            --speaking-glow: #14b8a6;
-            /* Teal */
-            --speaking-core: #f0fdfa;
+            /* State Colors - Blue Scheme */
+            --idle-color: #94a3b8;
+            --listening-glow: #3b82f6;
+            /* Bright Blue */
+            --listening-core: #dbeafe;
+            --processing-glow: #1e40af;
+            /* Navy Blue */
+            --processing-core: #eff6ff;
+            --speaking-glow: #0ea5e9;
+            /* Sky Blue */
+            --speaking-core: #e0f2fe;
 
             /* Chat Bubbles */
-            --user-bubble-bg: #27272a;
-            --ai-bubble-bg: #18181b;
+            --user-bubble-bg: #3b82f6;
+            --ai-bubble-bg: #f1f5f9;
 
             /* Orb Variables (Updated by JS) */
             --orb-scale: 1;
             --orb-glow-color: var(--idle-color);
-            --orb-core-color: #71717a;
+            --orb-core-color: #cbd5e1;
             --orb-border-radius: 50%;
         }
 
@@ -62,8 +63,8 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            /* Subtle grain texture overlay */
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            /* Subtle texture overlay for depth */
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
         }
 
         /* --- Header & Controls --- */
@@ -76,9 +77,10 @@
         h1 {
             font-family: 'Instrument Serif', serif;
             font-weight: 400;
-            font-size: 2.5rem;
+            font-size: 4rem;
             margin: 0;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
             color: var(--text-primary);
         }
 
@@ -96,7 +98,7 @@
 
         select {
             appearance: none;
-            background: rgba(255, 255, 255, 0.03);
+            background: var(--bg-surface);
             border: 1px solid var(--border);
             color: var(--text-secondary);
             padding: 8px 32px 8px 16px;
@@ -110,8 +112,8 @@
         }
 
         select:hover {
-            background: rgba(255, 255, 255, 0.07);
-            border-color: #3f3f46;
+            background: var(--bg-elevated);
+            border-color: #bfdbfe;
             color: var(--text-primary);
         }
 
@@ -184,7 +186,7 @@
             /* This morphing needs to be high perf, so we'll use JS or simple CSS keyframes for idle */
             transition: background 0.5s ease, border-radius 0.2s ease, transform 0.05s linear;
             transform: scale(var(--orb-scale));
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+            box-shadow: inset 0 0 20px rgba(30, 41, 59, 0.2);
         }
 
         /* Inner core for depth */
@@ -205,7 +207,7 @@
             opacity: 0.5;
             transition: opacity 0.3s ease;
             z-index: 10;
-            color: white;
+            color: var(--text-primary);
             pointer-events: none;
         }
 
@@ -270,14 +272,14 @@
 
         .user .bubble {
             background-color: var(--user-bubble-bg);
-            color: var(--text-primary);
+            color: #ffffff;
             border-radius: 20px 20px 4px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .ai .bubble {
             background-color: var(--ai-bubble-bg);
-            color: #d4d4d8;
+            color: var(--text-primary);
             border-radius: 20px 20px 20px 4px;
             border: 1px solid var(--border);
         }
